@@ -2,47 +2,41 @@
 <html lang="ka">
 <head>
     <meta charset="UTF-8" />
-    <title>Excel მონაცემების ძიება (მრავალშიტიანი)</title>
+    <title>CSV მონაცემების ძიება</title>
     <style>
         body { font-family: Arial; margin: 20px; }
         input { padding: 8px; width: 300px; font-size: 16px; }
         table { border-collapse: collapse; width: 100%; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 8px; }
         th { background-color: #f4f4f4; }
-        img { max-width: 100px; max-height: 100px; }
         #unique-selector { margin-top: 10px; }
     </style>
 </head>
 <body>
 
-<h2>მონაცემების ძიება Excel-იდან (მრავალშიტიანი)</h2>
-<input type="text" id="search" placeholder="შეიყვანე სახელი, გვარი, ციფრი..." />
+<h2>მონაცემების ძიება CSV ფაილიდან</h2>
+<input type="text" id="search" placeholder="სახელი, გვარი, ID..." />
 <div id="unique-selector"></div>
 <table id="data-table"></table>
 
-<script src="xlsx.full.min.js"></script>
 <script>
     let data = [];
 
-    async function loadExcel() {
-        try {
-            const response = await fetch('data.xlsx');
-            const arrayBuffer = await response.arrayBuffer();
-            const workbook = XLSX.read(arrayBuffer, { type: "array" });
+    async function loadCSV() {
+        const response = await fetch('data.csv');
+        const text = await response.text();
+        const rows = text.trim().split('\n').map(r => r.split(','));
 
-            let allData = [];
-            workbook.SheetNames.forEach(sheetName => {
-                const worksheet = workbook.Sheets[sheetName];
-                const sheetData = XLSX.utils.sheet_to_json(worksheet);
-                allData = allData.concat(sheetData);
+        const headers = rows[0];
+        data = rows.slice(1).map(row => {
+            const obj = {};
+            headers.forEach((h, i) => {
+                obj[h.trim()] = (row[i] || "").trim();
             });
+            return obj;
+        });
 
-            data = allData;
-            displayTable(data);
-        } catch (err) {
-            console.error("Excel-ის ჩატვირთვა ვერ მოხერხდა:", err);
-            document.getElementById('data-table').innerHTML = "<tr><td>Excel-ის ჩატვირთვა ვერ მოხერხდა.</td></tr>";
-        }
+        displayTable(data);
     }
 
     function displayTable(filteredData) {
@@ -67,14 +61,7 @@
             const tr = document.createElement('tr');
             headers.forEach(h => {
                 const td = document.createElement('td');
-                let val = row[h];
-                if (val && typeof val === 'string' && (val.toLowerCase().endsWith('.jpg') || val.toLowerCase().endsWith('.png'))) {
-                    const img = document.createElement('img');
-                    img.src = val;
-                    td.appendChild(img);
-                } else {
-                    td.textContent = val !== undefined && val !== null ? val : '';
-                }
+                td.textContent = row[h];
                 tr.appendChild(td);
             });
             table.appendChild(tr);
@@ -84,44 +71,12 @@
     document.getElementById('search').addEventListener('input', function () {
         const query = this.value.toLowerCase();
         const matches = data.filter(row =>
-            Object.values(row).some(val =>
-                val && val.toString().toLowerCase().includes(query)
-            )
+            Object.values(row).some(val => val.toLowerCase().includes(query))
         );
-
-        const firstNames = matches.map(row => row["სახელი"]).filter(n => n);
-        const lastNames = matches.map(row => row["გვარი"]).filter(n => n);
-        const uniqueLastNames = [...new Set(lastNames)];
-
-        const selectorDiv = document.getElementById('unique-selector');
-        selectorDiv.innerHTML = '';
-
-        if (firstNames.length > 0 && uniqueLastNames.length > 1) {
-            const label = document.createElement('label');
-            label.textContent = "აირჩიე გვარი: ";
-            const select = document.createElement('select');
-
-            uniqueLastNames.forEach(name => {
-                const option = document.createElement('option');
-                option.value = name;
-                option.textContent = name;
-                select.appendChild(option);
-            });
-
-            select.addEventListener('change', () => {
-                const selected = select.value;
-                const filtered = matches.filter(row => row["გვარი"] === selected);
-                displayTable(filtered);
-            });
-
-            selectorDiv.appendChild(label);
-            selectorDiv.appendChild(select);
-        }
-
         displayTable(matches);
     });
 
-    loadExcel();
+    loadCSV();
 </script>
 
 </body>
