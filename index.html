@@ -1,0 +1,118 @@
+
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+    <meta charset="UTF-8">
+    <title>Excel მონაცემების ძიება</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        input { padding: 6px; width: 300px; }
+        img { max-width: 100px; max-height: 100px; }
+    </style>
+</head>
+<body>
+
+    <h2>მონაცემების ძიება</h2>
+    <input type="text" id="search" placeholder="მოძებნე სახელი, გვარი, ციფრი...">
+
+    <div id="unique-selector" style="margin-top:10px;"></div>
+    <table id="data-table"></table>
+
+    <script>
+        let data = [];
+
+        async function loadCSV() {
+            const response = await fetch('data.csv');
+            const text = await response.text();
+            const rows = text.split('\n').map(row => row.split(','));
+
+            const headers = rows[0];
+            data = rows.slice(1).map(row => {
+                let obj = {};
+                headers.forEach((h, i) => obj[h.trim()] = (row[i] || "").trim());
+                return obj;
+            });
+
+            displayTable(data);
+        }
+
+        function displayTable(filteredData) {
+            const table = document.getElementById('data-table');
+            table.innerHTML = '';
+
+            if (filteredData.length === 0) {
+                table.innerHTML = '<tr><td colspan="100%">შედეგი არ მოიძებნა</td></tr>';
+                return;
+            }
+
+            const headers = Object.keys(filteredData[0]);
+            const thead = document.createElement('tr');
+            headers.forEach(h => {
+                const th = document.createElement('th');
+                th.textContent = h;
+                thead.appendChild(th);
+            });
+            table.appendChild(thead);
+
+            filteredData.forEach(row => {
+                const tr = document.createElement('tr');
+                headers.forEach(h => {
+                    const td = document.createElement('td');
+                    let val = row[h];
+                    if (val && (val.toLowerCase().endsWith('.jpg') || val.toLowerCase().endswith('.png'))) {
+                        const img = document.createElement('img');
+                        img.src = val;
+                        td.appendChild(img);
+                    } else {
+                        td.textContent = val !== "nan" ? val : "";
+                    }
+                    tr.appendChild(td);
+                });
+                table.appendChild(tr);
+            });
+        }
+
+        document.getElementById('search').addEventListener('input', function () {
+            const query = this.value.toLowerCase();
+            const matches = data.filter(row =>
+                Object.values(row).some(val => val && val.toLowerCase().includes(query))
+            );
+
+            const firstNames = matches.map(row => row["სახელი"]).filter(n => n);
+            const lastNames = matches.map(row => row["გვარი"]).filter(n => n);
+
+            const uniqueNames = [...new Set(lastNames)];
+            const selectorDiv = document.getElementById('unique-selector');
+            selectorDiv.innerHTML = '';
+
+            if (firstNames.length > 0 && uniqueNames.length > 1) {
+                const label = document.createElement('label');
+                label.textContent = "აირჩიე გვარი: ";
+                const select = document.createElement('select');
+
+                uniqueNames.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    select.appendChild(option);
+                });
+
+                select.addEventListener('change', () => {
+                    const selected = select.value;
+                    const filtered = matches.filter(row => row["გვარი"] === selected);
+                    displayTable(filtered);
+                });
+
+                selectorDiv.appendChild(label);
+                selectorDiv.appendChild(select);
+            }
+
+            displayTable(matches);
+        });
+
+        loadCSV();
+    </script>
+</body>
+</html>
