@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="ka">
 <head>
-    <meta charset="UTF-8" />
-    <title>Excel მონაცემების ძიება (მრავალ sheet)</title>
+    <meta charset="UTF-8">
+    <title>Excel მონაცემების ძიება</title>
     <style>
         body { font-family: Arial; margin: 20px; }
-        input { padding: 8px; width: 300px; font-size: 16px; }
+        input { padding: 8px; width: 300px; }
         table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; }
+        th, td { border: 1px solid #ccc; padding: 8px; }
         th { background-color: #f4f4f4; }
         img { max-width: 100px; max-height: 100px; }
         #unique-selector { margin-top: 10px; }
@@ -15,36 +15,29 @@
 </head>
 <body>
 
-<h2>Excel მონაცემების ძიება</h2>
-<input type="text" id="search" placeholder="მოძებნე სახელი, გვარი, ციფრი...">
+<h2>მონაცემების ძიება Excel-იდან</h2>
+<input type="text" id="search" placeholder="მოძებნე სახელი, გვარი, ციფრი..." />
 <div id="unique-selector"></div>
 <table id="data-table"></table>
 
-<!-- SheetJS ბიბლიოთეკა -->
 <script src="xlsx.full.min.js"></script>
 <script>
     let data = [];
 
     async function loadExcel() {
-        try {
-            const response = await fetch('data.xlsx');
-            const arrayBuffer = await response.arrayBuffer();
-            const workbook = XLSX.read(arrayBuffer, { type: "array" });
+        const response = await fetch('data.xlsx');
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: "array" });
 
-            // ყველა sheet-ის გაერთიანება
-            let allData = [];
-            workbook.SheetNames.forEach(sheetName => {
-                const worksheet = workbook.Sheets[sheetName];
-                const json = XLSX.utils.sheet_to_json(worksheet);
-                allData = allData.concat(json);
-            });
+        // ყველა sheet-დან მონაცემების წაკითხვა
+        data = [];
+        workbook.SheetNames.forEach(sheetName => {
+            const sheet = workbook.Sheets[sheetName];
+            const sheetData = XLSX.utils.sheet_to_json(sheet);
+            data = data.concat(sheetData);
+        });
 
-            data = allData;
-            displayTable(data);
-        } catch (err) {
-            console.error("Excel ფაილის წაკითხვის შეცდომა:", err);
-            document.getElementById('data-table').innerHTML = "<tr><td>Excel-ის ჩატვირთვა ვერ მოხერხდა.</td></tr>";
-        }
+        displayTable(data);
     }
 
     function displayTable(filteredData) {
@@ -69,16 +62,14 @@
             const tr = document.createElement('tr');
             headers.forEach(h => {
                 const td = document.createElement('td');
-                let val = row[h];
-
+                const val = row[h];
                 if (val && typeof val === 'string' && (val.toLowerCase().endsWith('.jpg') || val.toLowerCase().endsWith('.png'))) {
                     const img = document.createElement('img');
                     img.src = val;
                     td.appendChild(img);
                 } else {
-                    td.textContent = val && val !== "nan" ? val : '';
+                    td.textContent = val !== undefined && val !== null && val !== "nan" ? val : '';
                 }
-
                 tr.appendChild(td);
             });
             table.appendChild(tr);
@@ -93,17 +84,20 @@
             )
         );
 
-        const firstNames = matches.map(row => row["სახელი"]).filter(n => n);
-        const lastNames = matches.map(row => row["გვარი"]).filter(n => n);
-        const uniqueLastNames = [...new Set(lastNames)];
-
         const selectorDiv = document.getElementById('unique-selector');
         selectorDiv.innerHTML = '';
 
-        if (firstNames.length > 0 && uniqueLastNames.length > 1) {
+        const lastNames = matches.map(row => row["გვარი"]).filter(Boolean);
+        const uniqueLastNames = [...new Set(lastNames)];
+
+        if (uniqueLastNames.length > 1) {
             const label = document.createElement('label');
             label.textContent = "აირჩიე გვარი: ";
             const select = document.createElement('select');
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = 'ყველა';
+            select.appendChild(defaultOption);
 
             uniqueLastNames.forEach(name => {
                 const option = document.createElement('option');
@@ -114,7 +108,7 @@
 
             select.addEventListener('change', () => {
                 const selected = select.value;
-                const filtered = matches.filter(row => row["გვარი"] === selected);
+                const filtered = selected ? matches.filter(row => row["გვარი"] === selected) : matches;
                 displayTable(filtered);
             });
 
