@@ -114,5 +114,99 @@
 
         loadCSV();
     </script>
+<script>
+    let data = [];
+
+    async function loadExcel() {
+        const response = await fetch('data.xlsx');
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet);
+        console.log("Excel data loaded:", json);  // <-- აქ ნახე კონსოლში
+        data = json;
+        displayTable(data);
+    }
+
+    function displayTable(filteredData) {
+        const table = document.getElementById('data-table');
+        table.innerHTML = '';
+
+        if (filteredData.length === 0) {
+            table.innerHTML = '<tr><td colspan="100%">შედეგი არ მოიძებნა</td></tr>';
+            return;
+        }
+
+        const headers = Object.keys(filteredData[0]);
+        const thead = document.createElement('tr');
+        headers.forEach(h => {
+            const th = document.createElement('th');
+            th.textContent = h;
+            thead.appendChild(th);
+        });
+        table.appendChild(thead);
+
+        filteredData.forEach(row => {
+            const tr = document.createElement('tr');
+            headers.forEach(h => {
+                const td = document.createElement('td');
+                let val = row[h];
+                if (val && (typeof val === 'string') && (val.toLowerCase().endsWith('.jpg') || val.toLowerCase().endsWith('.png'))) {
+                    const img = document.createElement('img');
+                    img.src = val;
+                    td.appendChild(img);
+                } else {
+                    td.textContent = val !== "nan" ? val : "";
+                }
+                tr.appendChild(td);
+            });
+            table.appendChild(tr);
+        });
+    }
+
+    document.getElementById('search').addEventListener('input', function () {
+        const query = this.value.toLowerCase();
+        const matches = data.filter(row =>
+            Object.values(row).some(val =>
+                val && val.toString().toLowerCase().includes(query)
+            )
+        );
+
+        const firstNames = matches.map(row => row["სახელი"]).filter(n => n);
+        const lastNames = matches.map(row => row["გვარი"]).filter(n => n);
+        const uniqueLastNames = [...new Set(lastNames)];
+
+        const selectorDiv = document.getElementById('unique-selector');
+        selectorDiv.innerHTML = '';
+
+        if (firstNames.length > 0 && uniqueLastNames.length > 1) {
+            const label = document.createElement('label');
+            label.textContent = "აირჩიე გვარი: ";
+            const select = document.createElement('select');
+
+            uniqueLastNames.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                select.appendChild(option);
+            });
+
+            select.addEventListener('change', () => {
+                const selected = select.value;
+                const filtered = matches.filter(row => row["გვარი"] === selected);
+                displayTable(filtered);
+            });
+
+            selectorDiv.appendChild(label);
+            selectorDiv.appendChild(select);
+        }
+
+        displayTable(matches);
+    });
+
+    loadExcel();
+</script>
+
 </body>
 </html>
